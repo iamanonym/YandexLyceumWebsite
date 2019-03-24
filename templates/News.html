@@ -1,0 +1,15 @@
+{% extends 'Main.html' %}
+
+{% block content %}
+{% for article in news %}
+<div>
+    <h2>
+        <a href="/news/{{ article.id }}">
+            <font color="black">{{ article.title }}</font>
+        </a>
+    </h2>
+    <span>{{ article.content }}</span>
+</div>
+</br>
+{% endfor %}
+{% endblock %}
