@@ -9,9 +9,9 @@
   <body>
     <header>
       <nav class="navbar navbar-light bg-light justify-content-between">
-          <div class="navbar-brand" href="#">
+          <a class="navbar-brand" href="/">
               <b><font color="red">Я</font></b>ндекс Лицей. Магнитогорск
-          </div>
+          </a>
           <a role="button" href="/login" class="btn btn-warning">Войти в систему</a>
       </nav>
     </header>
@@ -54,8 +54,24 @@
           <a class="dropdown-item" href="/coordinator">Координатор</a>
         </div>
         </div>
-        <a class="navbar-brand" href="#">Студентам</a>
-        <a class="navbar-brand" href="#">Абитуриентам</a>
+        <div class="nav-item dropdown">
+        <a class="navbar-brand dropdown-toggle" id="navbarDropdownMenuLink2" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          Студентам
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
+          <a class="dropdown-item" href="/schedule"><font size="-1">Расписание</font></a>
+          <div class="dropdown-item dropright">
+              <a class="dropdown-toggle" id="navbarDropdownMenuLink3" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                  <font size="-1">Литература</font></a>
+              <div class="dropdown-menu">
+                  <a class="dropdown-item" href="/studentbook/1">Python</a>
+                  <a class="dropdown-item" href="/studentbook/2">Flask</a>
+                  <a class="dropdown-item" href="/studentbook/3">Data Science</a>
+              </div>
+          </div>
+        </div>
+        </div>
+        <a class="navbar-brand" href="/abitu">Абитуриентам</a>
         </nav>
     </br>
     {% block content %}

@@ -1,0 +1,18 @@
+{% extends 'Base.html' %}
+
+{% block content %}
+<h1>Вопрос {{ task_id }}</h1></br>
+<form action="" method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <p>
+        {{ form.task.label }}<br>
+        {{ form.task }}<br>
+        {% for error in form.task.errors %}
+            <div class="alert alert-danger" role="alert">
+                {{ error }}
+            </div>
+        {% endfor %}
+    </p>
+    <p>{{ form.submit }}</p>
+</form>
+{% endblock %}
