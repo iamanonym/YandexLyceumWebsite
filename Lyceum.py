@@ -107,7 +107,10 @@ def check_task(task_id, code):
         "file2 = open('static/text/output{}.txt', 'w')\n" \
         "stdout = sys.stdout\nsys.stdin = file1\n" \
         "sys.stdout = file2\n".format(task_id, task_id) + temp
-    exec(code2)
+    try:
+        exec(code2)
+    except Exception:
+        return False
     res = None
     with open('static/text/output{}.txt'.format(task_id)) as file:
         res = file.read()
@@ -372,6 +375,9 @@ def logout():
 def index():
     if 'username' not in session:
         return redirect('/login')
+    user = Student.query.filter_by(username=session['username']).first()
+    if not user:
+        return redirect('/login')
     tasks = Task.query.all()
     forms = {1: TaskForm(id=1), 2: TaskForm(id=2), 3: TaskForm(id=3)}
     for number in range(1, len(forms) + 1):
@@ -380,11 +386,9 @@ def index():
                 if check_task(number, forms[number].text.data):
                     task = Task.query.\
                         filter_by(title=tasks[number - 1].title).first()
-                    user = Student.query. \
-                        filter_by(username=session['username']).first()
-                    task = tasks[number - 1]
                     solution = Solution(code=forms[number].text.data,
-                                        status='ok')
+                                        status='ok', student_id=user.id,
+                                        task_id=task.id)
                     user.Solutions.append(solution)
                     task.Solutions.append(solution)
                     db.session.add(solution)
