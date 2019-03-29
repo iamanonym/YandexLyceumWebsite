@@ -35,21 +35,14 @@
                 </div>
             {% endfor %}
             </p>
-            <p>{{ form.submit }}</p>
+                <p>{{ form.submit }}</p>
             </form>
         </td>
         <td>
             <center>
-                Если вы здесь впервые, зарегистрируйтесь
+                Если вы здесь впервые, зарегистрируйтесь</br></br>
+                <a href="/register" class="btn btn-dark" role="button">Регистрация</a>
             </center>
-            <form action="" method="post" novalidate>
-                {{ form.hidden_tag() }}
-                <p>
-                    <center>
-                        {{ form2.register }}
-                    </center>
-                </p>
-            </form>
         </td>
     </tr>
     </tbody>

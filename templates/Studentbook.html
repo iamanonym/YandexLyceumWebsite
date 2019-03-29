@@ -1,6 +1,18 @@
 {% extends 'Main.html' %}
 
 {% block content %}
-<h1>Учебная литература</h1></br></br>
+<h1>Учебная литература</h1></br>
+{% if src %}
 <embed src="{{ src }}" width="1000" height="1000"/></br></br>
+{% else %}
+<a href="/studentbook/1">
+    <font size="+2" color="red">Python</font>
+</a></br></br>
+<a href="/studentbook/2">
+    <font size="+2" color="red">Flask</font>
+</a></br></br>
+<a href="/studentbook/3">
+    <font size="+2" color="red">Data Science</font>
+</a></br></br>
+{% endif %}
 {% endblock %}

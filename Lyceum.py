@@ -5,8 +5,10 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, \
     SubmitField, SelectField, TextAreaField, RadioField
 from werkzeug.security import generate_password_hash, check_password_hash
-from wtforms.validators import DataRequired, Email, EqualTo
+from wtforms.validators import DataRequired, Email, \
+    EqualTo, ValidationError, Length
 import json
+import sys
 from flask_restful import reqparse, abort, Api, Resource
 
 
@@ -41,6 +43,79 @@ BOOK = {1: 'https://vk.com/doc7608079_448293932?'
            'hash=f0a04cbc3f1c723542&dl=035031a390ac63eb85',
         3: 'https://vk.com/doc7608079_487953471?'
            'hash=030508d4371e0c9055&dl=9278a8c41509462672'}
+PROGRAM = {1: 'https://docviewer.yandex.ru/view/70851904/?*=7sebe5u%2F%'
+              '2Bvmaknm4LCE9BXEppJp7InVybCI6InlhLWRpc2stcHVibGljOi8vYTR'
+              'OeUQ1L01FVnlnWHFDTTBqUXFwNzBYbEhGOFhxTksxbHNyUU43Q08ydGVw'
+              'WjlOclNJWnhwYlZ0dlBCcTIzNHRGUDZnd2JqdnRhYWZUcHRjdWE0U0E9P'
+              'SIsInRpdGxlIjoiVGhlX2Jhc2ljc19vZl9wcm9ncmFtbWluZ19pbl9QeX'
+              'Rob25fMTQ0X2hvdXJzLnBkZiIsInVpZCI6IjcwODUxOTA0IiwieXUiOiI'
+              '1NDUyNDgzNDcxNTUwMzg4NDY5Iiwibm9pZnJhbWUiOmZhbHNlLCJ0cyI6'
+              'MTU1Mzc1Njg0Mzk1M30%3D',
+           2: 'https://docviewer.yandex.ru/view/70851904/?*=9D6E0XNwTSZG'
+              'dY0AoQl4Q6B%2Bq8p7InVybCI6InlhLWRpc2stcHVibGljOi8vYTROeUQ'
+              '1L01FVnlnWHFDTTBqUXFweVgvRkt6bVgvSU84VTBKa2JtTlBDd1MwYS9G'
+              'WEZRUUlhWFBrNDByNlQ5cUVrSTBlMGl0L1A1M0pqQktkcmpGdWc9PSIsI'
+              'nRpdGxlIjoiRnVuZGFtZW50YWxzX29mX2luZHVzdHJpYWxfcHJvZ3JhbW'
+              '1pbmdfMTY4X2hvdXJzLnBkZiIsInVpZCI6IjcwODUxOTA0IiwieXUiOiI'
+              '1NDUyNDgzNDcxNTUwMzg4NDY5Iiwibm9pZnJhbWUiOmZhbHNlLCJ0cyI6'
+              'MTU1Mzc1NjkyMjc1NX0%3D'}
+
+
+def check_password(password):  # Проверка пароля
+    if password.isdigit() or password.isalpha():
+        return 'Пароль состоит из символов одного вида'
+    elif set(password).intersection({',', '.', '!', '?', '/', '\\',
+                                     ';', '(', ')', '&', '[', ']',
+                                     '<', '>', '*', '|', ':', '"'}):
+        return 'Недопустимые символы в пароле'
+    else:
+        return 'OK'
+
+
+def fill_news():
+    with open('static/text/News.json') as file:
+        news = json.loads(file.read())
+        for article in news:
+            temp = \
+                Article.query.filter_by(title=news[article]['title']).first()
+            if temp is None:
+                article_obj = Article(title=news[article]['title'],
+                                      content=news[article]['content'],
+                                      text=news[article]['text'])
+                db.session.add(article_obj)
+                db.session.commit()
+
+
+def fill_tasks():
+    with open('static/text/Tasks.json') as file:
+        tasks = json.loads(file.read())
+        for task in tasks:
+            temp = Task.query.filter_by(title=tasks[task]['title']).first()
+            if temp is None:
+                task_obj = Task(title=tasks[task]['title'],
+                                condition=tasks[task]['condition'],
+                                handheld=bool(int(tasks[task]['handheld'])))
+                db.session.add(task_obj)
+                db.session.commit()
+
+
+def check_task(task_id, code):
+    temp = code if code.endswith('\n') else code + \
+            '\n' + "sys.stdout = stdout\nfile1.close()\nfile2.close()\n"
+    code2 = \
+        "file1 = open('static/text/input{}.txt')\n" \
+        "file2 = open('static/text/output{}.txt', 'w')\n" \
+        "stdout = sys.stdout\nsys.stdin = file1\n" \
+        "sys.stdout = file2\n".format(task_id, task_id) + temp
+    exec(code2)
+    res = None
+    with open('static/text/output{}.txt'.format(task_id)) as file:
+        res = file.read()
+        file.close()
+    with open('static/text/res{}.txt'.format(task_id)) as file2:
+        solve = file2.read()
+        file2.close()
+    return res == solve
 
 
 class Tester:
@@ -85,6 +160,7 @@ class Student(db.Model):
     surname = db.Column(db.String(80), unique=False, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     group = db.Column(db.String(80), unique=False, nullable=False)
+    teacher = db.Column(db.Boolean, unique=False, nullable=False)
 
     def __repr__(self):
         return '<Student {} {} {} {}>'.format(
@@ -94,18 +170,30 @@ class Student(db.Model):
         return check_password_hash(self.password_hash, password)
 
 
-class Solution(db.Model):
+class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    task = db.Column(db.String(80), unique=False, nullable=False)
-    code = db.Column(db.String(1000), unique=False, nullable=False)
-    status = db.Column(db.String(50), unique=False, nullable=False)
-    student_id = db.Column(db.Integer,
-                           db.ForeignKey('student.id'),
-                           nullable=False)
+    title = db.Column(db.String(80), unique=True, nullable=False)
+    condition = db.Column(db.String(80), unique=False, nullable=False)
+    handheld = db.Column(db.Boolean, unique=False, nullable=False)
 
     def __repr__(self):
-        return '<SolutionAttempt {} {} {}>'.format(
-            self.id, self.task, self.status)
+        return '<Task {} {}>'.format(self.id, self.title)
+
+
+class Solution(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(1000), unique=False, nullable=False)
+    status = db.Column(db.String(50), unique=False, nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey('student.id'),
+                           nullable=False)
+    student = db.relationship('Student',
+                              backref=db.backref('Solutions', lazy=True))
+    task_id = db.Column(db.Integer, db.ForeignKey('task.id'),
+                        nullable=False)
+    task = db.relationship('Task', backref=db.backref('Solutions', lazy=True))
+
+    def __repr__(self):
+        return '<Solution {} {} {}>'.format(self.id, self.task, self.status)
 
 
 class Article(db.Model):
@@ -119,34 +207,72 @@ class Article(db.Model):
 
 
 class LoginForm(FlaskForm):
-    username = StringField('Введите логин', validators=[DataRequired()])
-    password = PasswordField('Введите пароль', validators=[DataRequired()])
+    username = StringField('Введите логин',
+                           validators=[DataRequired('Заполните это поле')])
+    password = \
+        PasswordField('Введите пароль',
+                      validators=[DataRequired('Заполните это поле')])
     submit = SubmitField('Войти')
 
 
-class SubmitRegisterForm(FlaskForm):
-    register = SubmitField('Регистрация')
-
-
 class RegisterForm(FlaskForm):
-    username = StringField('Введите Ваш логин', validators=[DataRequired()])
-    password = PasswordField('Введите пароль', validators=[DataRequired()])
-    password2 = PasswordField('Повторите пароль',
-                              validators=[DataRequired(),
-                                          EqualTo('password')])
-    name = StringField('Введите Ваше имя', validators=[DataRequired()])
-    surname = StringField('Введите Вашу фамилию', validators=[DataRequired()])
-    email = StringField('Введите Ваш email', validators=[DataRequired(), Email()])
+    username = \
+        StringField('Введите Ваш логин',
+                    validators=[DataRequired(message='Заполните это поле'),
+                                Length(min=6, max=10,
+                                       message='Неправильная длина')])
+    password = \
+        PasswordField('Введите пароль',
+                      validators=[DataRequired(message='Заполните это поле'),
+                                  Length(min=6, max=10,
+                                         message='Неправильная длина')])
+    password2 = \
+        PasswordField('Повторите пароль',
+                      validators=[DataRequired(message='Заполните это поле'),
+                                  EqualTo('password', 'Пароли не совпадают')])
+    name = \
+        StringField('Введите Ваше имя',
+                    validators=[DataRequired(message='Заполните это поле')])
+    surname = \
+        StringField('Введите Вашу фамилию',
+                    validators=[DataRequired(message='Заполните это поле')])
+    email = \
+        StringField('Введите Ваш email',
+                    validators=[DataRequired(message='Заполните это поле'),
+                                Email(message='Неправильный адрес почты')])
     group = SelectField('Выберите вашу группу',
                         choices=[('1 группа, 2 год', '1 группа, 2 год'),
                                  ('2 группа, 2 год', '2 группа, 2 год'),
                                  ('1 группа, 1 год', '1 группа, 1 год')])
     submit = SubmitField('Зарегистрироваться')
 
+    def validate_username(self, username):
+        student = Student.query.filter_by(username=username.data).first()
+        if student is not None:
+            raise ValidationError('Данный логин уже существует')
+
+    def validate_password(self, password):
+        check = check_password(password.data)
+        if check is not 'OK':
+            raise ValidationError(check)
+
 
 class TaskForm(FlaskForm):
-    text = TextAreaField('Решение')
+    text = \
+        TextAreaField('Решение',
+                      validators=[DataRequired(message='Необходимо ввести '
+                                                       'код решения')])
     submit = SubmitField('Отправить')
+
+    def __init__(self, id):
+        super().__init__()
+        self.id = id
+
+    def validate_text(self, text):
+        for word in ['while', 'for', 'def', 'import', 'open']:
+            if word in text.data:
+                raise ValidationError('Недопустимое слово '
+                                      'в решении: {}'.format(word))
 
 
 class TestForm1(FlaskForm):
@@ -180,26 +306,38 @@ db.create_all()
 tester = Tester()
 
 
+@app.errorhandler(403)
+def page_not_found(error):
+    return render_template('Error.html', title='Неверный логин или пароль',
+                           error_code=403), 403
+
+
 @app.errorhandler(404)
 def page_not_found(error):
-    return render_template('Error404.html', title='Страница не найдена'), 404
+    return render_template('Error.html', title='Страница не найдена',
+                           error_code=404), 404
+
+
+@app.errorhandler(500)
+def error_in_program(error):
+    return render_template('Error.html', title='Ошибка во время выполнения',
+                           error_code=500), 500
 
 
 @app.route('/login', methods=['GET', 'POST'])
 @app.route('/login/', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
-    form2 = SubmitRegisterForm()
     if form.validate_on_submit():
         user = Student.query.filter_by(username=form.username.data).first()
         if user is None or not user.check_password(form.password.data):
-            pass
+            abort(403, message='Неверный логин или пароль')
         else:
+            session['username'] = user.username
+            session['user_id'] = user.id
             return redirect("/index")
-    if form2.validate_on_submit():
-        return redirect('/register')
     return render_template('Login.html', title='Авторизация',
-                           form=form, form2=form2)
+                           form=form)
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -207,11 +345,12 @@ def login():
 def register():
     form = RegisterForm()
     if form.validate_on_submit():
-        user = Student(username=form.username.data,
-                       password_hash=
-                       generate_password_hash(form.password.data),
-                       name=form.name.data, surname=form.surname.data,
-                       email=form.email.data, group=form.group.data)
+        user = \
+            Student(username=form.username.data,
+                    password_hash=generate_password_hash(form.password.data),
+                    name=form.name.data, surname=form.surname.data,
+                    email=form.email.data, group=form.group.data,
+                    teacher=False)
         db.session.add(user)
         db.session.commit()
         session['username'] = form.username.data
@@ -233,8 +372,36 @@ def logout():
 def index():
     if 'username' not in session:
         return redirect('/login')
-    form = TaskForm()
-    return render_template('Task_page.html', title='Задача', form=form)
+    tasks = Task.query.all()
+    forms = {1: TaskForm(id=1), 2: TaskForm(id=2), 3: TaskForm(id=3)}
+    for number in range(1, len(forms) + 1):
+        if forms[number].validate_on_submit():
+            if not tasks[number - 1].handheld:
+                if check_task(number, forms[number].text.data):
+                    task = Task.query.\
+                        filter_by(title=tasks[number - 1].title).first()
+                    user = Student.query. \
+                        filter_by(username=session['username']).first()
+                    task = tasks[number - 1]
+                    solution = Solution(code=forms[number].text.data,
+                                        status='ok')
+                    user.Solutions.append(solution)
+                    task.Solutions.append(solution)
+                    db.session.add(solution)
+                    db.session.commit()
+                else:
+                    task = Task.query. \
+                        filter_by(title=tasks[number - 1].title).first()
+                    user = Student.query. \
+                        filter_by(username=session['username']).first()
+                    solution = Solution(code=forms[number].text.data,
+                                        status='Доработать')
+                    user.Solutions.append(solution)
+                    task.Solutions.append(solution)
+                    db.session.add(solution)
+                    db.session.commit()
+    return render_template('Task_page.html', title='Задача',
+                           items=tasks, forms=forms)
 
 
 @app.route('/', methods=['GET'])
@@ -345,34 +512,46 @@ def test_result():
 @app.route('/schedule', methods=['GET', 'POST'])
 @app.route('/schedule/', methods=['GET', 'POST'])
 def schedule():
-    return render_template('Schedule.html', title='Абитуриентам',
+    return render_template('Schedule.html', title='Расписание',
                            src1=url_for('static', filename='img/d.png'),
                            src2=url_for('static', filename='img/d.png'),
                            src3=url_for('static', filename='img/d.png'))
 
 
+@app.route('/studentbook')
+@app.route('/studentbook/')
+def studentbook():
+    return render_template('Studentbook.html', title='Учебные материалы',
+                           src1=url_for('static', filename='img/d.png'),
+                           src2=url_for('static', filename='img/d.png'),
+                           src3=url_for('static', filename='img/d.png'),
+                           src=None)
+
+
 @app.route('/studentbook/<int:book_id>/', methods=['GET'])
 @app.route('/studentbook/<int:book_id>', methods=['GET'])
-def studentbook(book_id):
+def studentbook_by_id(book_id):
     if not 1 <= book_id <= 3:
         abort(404, message='Книга не найдена')
     else:
-        return render_template('Studentbook.html', title='Абитуриентам',
+        return render_template('Studentbook.html', title='Учебные материалы',
                                src1=url_for('static', filename='img/d.png'),
                                src2=url_for('static', filename='img/d.png'),
                                src3=url_for('static', filename='img/d.png'),
                                src=BOOK[book_id])
 
 
+@app.route('/program')
+@app.route('/program/')
+def program():
+    return render_template('Program.html', title='Программа обучения',
+                           src1=url_for('static', filename='img/d.png'),
+                           src2=url_for('static', filename='img/d.png'),
+                           src3=url_for('static', filename='img/d.png'),
+                           href=PROGRAM)
+
+
 if __name__ == '__main__':
-    with open('News.json') as file:
-        news = json.loads(file.read())
-        for article in news:
-            temp = Article.query.filter_by(title=news[article]['title']).first()
-            if temp is None:
-                article_obj = Article(title=news[article]['title'],
-                                      content=news[article]['content'],
-                                      text=news[article]['text'])
-                db.session.add(article_obj)
-                db.session.commit()
+    fill_news()
+    fill_tasks()
     app.run(port=8000, host='127.0.0.1')
