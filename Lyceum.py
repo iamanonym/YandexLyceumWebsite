@@ -113,10 +113,10 @@ def check_task(task_id, code):
         return False
     res = None
     with open('static/text/output{}.txt'.format(task_id)) as file:
-        res = file.read()
+        res = file.read().rstrip()
         file.close()
     with open('static/text/res{}.txt'.format(task_id)) as file2:
-        solve = file2.read()
+        solve = file2.read().rstrip()
         file2.close()
     return res == solve
 
@@ -260,19 +260,43 @@ class RegisterForm(FlaskForm):
             raise ValidationError(check)
 
 
-class TaskForm(FlaskForm):
+class TaskForm1(FlaskForm):
     text = \
         TextAreaField('Решение',
                       validators=[DataRequired(message='Необходимо ввести '
                                                        'код решения')])
     submit = SubmitField('Отправить')
 
-    def __init__(self, id):
-        super().__init__()
-        self.id = id
+    def validate_text(self, text):
+        for word in ['while', 'for', 'def', 'import', 'open', 'os']:
+            if word in text.data:
+                raise ValidationError('Недопустимое слово '
+                                      'в решении: {}'.format(word))
+
+
+class TaskForm2(FlaskForm):
+    text = \
+        TextAreaField('Решение',
+                      validators=[DataRequired(message='Необходимо ввести '
+                                                       'код решения')])
+    submit = SubmitField('Отправить')
 
     def validate_text(self, text):
-        for word in ['while', 'for', 'def', 'import', 'open']:
+        for word in ['while', 'for', 'def', 'import', 'open', 'os']:
+            if word in text.data:
+                raise ValidationError('Недопустимое слово '
+                                      'в решении: {}'.format(word))
+
+
+class TaskForm3(FlaskForm):
+    text = \
+        TextAreaField('Решение',
+                      validators=[DataRequired(message='Необходимо ввести '
+                                                       'код решения')])
+    submit = SubmitField('Отправить')
+
+    def validate_text(self, text):
+        for word in ['while', 'for', 'def', 'import', 'open', 'os']:
             if word in text.data:
                 raise ValidationError('Недопустимое слово '
                                       'в решении: {}'.format(word))
@@ -378,8 +402,9 @@ def index():
     user = Student.query.filter_by(username=session['username']).first()
     if not user:
         return redirect('/login')
+    print(user.Solutions)
     tasks = Task.query.all()
-    forms = {1: TaskForm(id=1), 2: TaskForm(id=2), 3: TaskForm(id=3)}
+    forms = {1: TaskForm1(), 2: TaskForm2(), 3: TaskForm3()}
     for number in range(1, len(forms) + 1):
         if forms[number].validate_on_submit():
             if not tasks[number - 1].handheld:
@@ -387,7 +412,7 @@ def index():
                     task = Task.query.\
                         filter_by(title=tasks[number - 1].title).first()
                     solution = Solution(code=forms[number].text.data,
-                                        status='ok', student_id=user.id,
+                                        status='OK', student_id=user.id,
                                         task_id=task.id)
                     user.Solutions.append(solution)
                     task.Solutions.append(solution)
@@ -396,14 +421,23 @@ def index():
                 else:
                     task = Task.query. \
                         filter_by(title=tasks[number - 1].title).first()
-                    user = Student.query. \
-                        filter_by(username=session['username']).first()
                     solution = Solution(code=forms[number].text.data,
-                                        status='Доработать')
+                                        status='WA', student_id=user.id,
+                                        task_id=task.id)
                     user.Solutions.append(solution)
                     task.Solutions.append(solution)
                     db.session.add(solution)
                     db.session.commit()
+            else:
+                task = Task.query. \
+                    filter_by(title=tasks[number - 1].title).first()
+                solution = Solution(code=forms[number].text.data,
+                                    status='-', student_id=user.id,
+                                    task_id=task.id)
+                user.Solutions.append(solution)
+                task.Solutions.append(solution)
+                db.session.add(solution)
+                db.session.commit()
     return render_template('Task_page.html', title='Задача',
                            items=tasks, forms=forms)
 
