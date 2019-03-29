@@ -4,7 +4,7 @@
 <div id="accordion">
   {% for number in range(3) %}
   <div class="card">
-    <div class="card-header" id="{{ number + 1 }}">
+    <div class="card-header" id="{{ number + 1}}">
         <h5 class="mb-0">
             <button class="btn btn-link" data-toggle="collapse" data-target="#{{ (number + 1) * 10 }}" aria-expanded="false" aria-controls="{{ (number + 1) * 10 }}">
                 {{ items[number].title }}
@@ -12,24 +12,28 @@
             {% if items[number].handheld %}
             <span class="badge badge-light">РУЧ</span>
             {% endif %}
+            {% if sols[number] %}
+            {% if sols[number].status == 'OK' %}
+                <img src="/static/img/green.png" width="30" height="30"></img>
+            {% else %}
+                {% if sols[number].status == 'WA' %}
+                    <img src="/static/img/red.png" width="30" height="30"></img>
+                {% else %}
+                    {% if sols[number].status == '-' %}
+                        <img src="/static/img/yellow.png" width="30" height="30"></img>
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+            {% endif %}
         </h5>
     </div>
-    <div id="{{ (number + 1) * 10 }}" class="collapse" aria-labelledby="{{ number + 1 }}" data-parent="#accordion">
+    <div id="{{ (number + 1) * 10 }}" class="collapse" aria-labelledby="{{ number + 1}}" data-parent="#accordion">
         <div class="card-body">
+            <p>
             {{ items[number].condition }}
-            <form action="" method="post" novalidate>
-                {{ forms[number + 1].hidden_tag() }}
-                <p>
-                {{ forms[number + 1].text.label }}<br>
-                {{ forms[number + 1].text(cols=70, rows=10) }}<br>
-                {% for error in forms[number + 1].text.errors %}
-                    <div class="alert alert-danger" role="alert">
-                        {{ error }}
-                    </div>
-                {% endfor %}
-                </p>
-                <p>{{ forms[number + 1].submit }}</p>
-            </form>
+            <a class="btn btn-warning" href="/index/{{ number + 1 }}" role="button">
+                Перейти к задаче
+            </a></p>
         </div>
     </div>
   </div>

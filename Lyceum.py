@@ -260,35 +260,7 @@ class RegisterForm(FlaskForm):
             raise ValidationError(check)
 
 
-class TaskForm1(FlaskForm):
-    text = \
-        TextAreaField('Решение',
-                      validators=[DataRequired(message='Необходимо ввести '
-                                                       'код решения')])
-    submit = SubmitField('Отправить')
-
-    def validate_text(self, text):
-        for word in ['while', 'for', 'def', 'import', 'open', 'os']:
-            if word in text.data:
-                raise ValidationError('Недопустимое слово '
-                                      'в решении: {}'.format(word))
-
-
-class TaskForm2(FlaskForm):
-    text = \
-        TextAreaField('Решение',
-                      validators=[DataRequired(message='Необходимо ввести '
-                                                       'код решения')])
-    submit = SubmitField('Отправить')
-
-    def validate_text(self, text):
-        for word in ['while', 'for', 'def', 'import', 'open', 'os']:
-            if word in text.data:
-                raise ValidationError('Недопустимое слово '
-                                      'в решении: {}'.format(word))
-
-
-class TaskForm3(FlaskForm):
+class TaskForm(FlaskForm):
     text = \
         TextAreaField('Решение',
                       validators=[DataRequired(message='Необходимо ввести '
@@ -402,44 +374,52 @@ def index():
     user = Student.query.filter_by(username=session['username']).first()
     if not user:
         return redirect('/login')
-    print(user.Solutions)
     tasks = Task.query.all()
-    forms = {1: TaskForm1(), 2: TaskForm2(), 3: TaskForm3()}
-    for number in range(1, len(forms) + 1):
-        if forms[number].validate_on_submit():
-            if not tasks[number - 1].handheld:
-                if check_task(number, forms[number].text.data):
-                    task = Task.query.\
-                        filter_by(title=tasks[number - 1].title).first()
-                    solution = Solution(code=forms[number].text.data,
-                                        status='OK', student_id=user.id,
-                                        task_id=task.id)
+    sols = []
+    for task in tasks:
+        temp = Solution.query.filter_by(student_id=user.id,
+                                        task_id=task.id).first()
+        sols.append(temp)
+    return render_template('Task_page.html', title='Задача',
+                           items=tasks, sols=sols)
+
+
+@app.route('/index/<int:task_id>', methods=['GET', 'POST'])
+@app.route('/index/<int:task_id>/', methods=['GET', 'POST'])
+def task_page(task_id):
+    if 1 <= task_id <= 3:
+        task = Task.query.filter_by(id=task_id).first()
+        user = Student.query.filter_by(username=session['username']).first()
+        form = TaskForm()
+        if 'username' not in session or user is None:
+            return redirect('/login')
+        temp = Solution.query.filter_by(student_id=user.id, task_id=task.id).first()
+        if form.validate_on_submit():
+            if not task.handheld and temp is None:
+                if check_task(task.id, form.text.data):
+                    solution = Solution(code=form.text.data, status='OK',
+                                        student_id=user.id, task_id=task.id)
                     user.Solutions.append(solution)
                     task.Solutions.append(solution)
                     db.session.add(solution)
                     db.session.commit()
                 else:
-                    task = Task.query. \
-                        filter_by(title=tasks[number - 1].title).first()
-                    solution = Solution(code=forms[number].text.data,
-                                        status='WA', student_id=user.id,
-                                        task_id=task.id)
+                    solution = Solution(code=form.text.data, status='WA',
+                                        student_id=user.id, task_id=task.id)
                     user.Solutions.append(solution)
                     task.Solutions.append(solution)
                     db.session.add(solution)
                     db.session.commit()
-            else:
-                task = Task.query. \
-                    filter_by(title=tasks[number - 1].title).first()
-                solution = Solution(code=forms[number].text.data,
-                                    status='-', student_id=user.id,
-                                    task_id=task.id)
+            elif temp is None:
+                solution = Solution(code=form.text.data, status='-',
+                                    student_id=user.id, task_id=task.id)
                 user.Solutions.append(solution)
                 task.Solutions.append(solution)
                 db.session.add(solution)
                 db.session.commit()
-    return render_template('Task_page.html', title='Задача',
-                           items=tasks, forms=forms)
+        return render_template('Task.html', task=task, form=form, sol=temp)
+    else:
+        abort(404, message='Страница не найдена')
 
 
 @app.route('/', methods=['GET'])

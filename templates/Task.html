@@ -1,0 +1,38 @@
+{% extends 'Base.html' %}
+
+{% block content %}
+<h1>
+    {{ task.title }}
+    {% if sol %}
+        {% if sol.status == 'OK' %}
+            <img src="/static/img/green.png" width="30" height="30"></img>
+        {% else %}
+            {% if sol.status == 'WA' %}
+                <img src="/static/img/red.png" width="30" height="30"></img>
+            {% else %}
+                {% if sol.status == '-' %}
+                    <img src="/static/img/yellow.png" width="30" height="30"></img>
+                {% endif %}
+            {% endif %}
+        {% endif %}
+    {% endif %}
+</h1>
+<div>
+    {{ task.condition }}
+</div>
+<div>
+    <form action="" method="post" novalidate>
+        {{  form.hidden_tag() }}
+        <p>
+            {{ form.text.label }}<br>
+            {{ form.text(cols=70, rows=10) }}<br>
+            {% for error in form.text.errors %}
+                <div class="alert alert-danger" role="alert">
+                    {{ error }}
+                </div>
+            {% endfor %}
+        </p>
+        <p>{{ form.submit }}</p>
+    </form>
+</div>
+{% endblock %}
