@@ -1,6 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from flask import Flask, render_template, redirect, session, \
-    url_for
+from flask import Flask, render_template, redirect, session
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, \
     SubmitField, SelectField, TextAreaField, RadioField
@@ -9,12 +8,12 @@ from wtforms.validators import DataRequired, Email, \
     EqualTo, ValidationError, Length
 import json
 import sys
-from flask_restful import reqparse, abort, Api, Resource
+from flask_restful import abort
 
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'mYsEcReTkEy'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///Lyceum.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -72,13 +71,22 @@ def check_password(password):  # Проверка пароля
         return 'OK'
 
 
-def fill_news():
+def add_solution(code, status, user, task):  # Добавление решения в базу
+    solution = Solution(code=code, status=status,
+                        student_id=user.id, task_id=task.id)
+    user.Solutions.append(solution)
+    task.Solutions.append(solution)
+    db.session.add(solution)
+    db.session.commit()
+
+
+def fill_news():  # Добавление новостей в базу
     with open('static/text/News.json') as file:
         news = json.loads(file.read())
         for article in news:
             temp = \
                 Article.query.filter_by(title=news[article]['title']).first()
-            if temp is None:
+            if temp is None:  # Проверка наличия новости в базе
                 article_obj = Article(title=news[article]['title'],
                                       content=news[article]['content'],
                                       text=news[article]['text'])
@@ -86,12 +94,12 @@ def fill_news():
                 db.session.commit()
 
 
-def fill_tasks():
+def fill_tasks():  # Добавление задач в базу
     with open('static/text/Tasks.json') as file:
         tasks = json.loads(file.read())
         for task in tasks:
             temp = Task.query.filter_by(title=tasks[task]['title']).first()
-            if temp is None:
+            if temp is None:  # Проверка наличия задачи в базе
                 task_obj = Task(title=tasks[task]['title'],
                                 condition=tasks[task]['condition'],
                                 handheld=bool(int(tasks[task]['handheld'])))
@@ -99,51 +107,70 @@ def fill_tasks():
                 db.session.commit()
 
 
-def check_task(task_id, code):
-    temp = code if code.endswith('\n') else code + \
-            '\n' + "sys.stdout = stdout\nfile1.close()\nfile2.close()\n"
-    code2 = \
-        "file1 = open('static/text/input{}.txt')\n" \
-        "file2 = open('static/text/output{}.txt', 'w')\n" \
-        "stdout = sys.stdout\nsys.stdin = file1\n" \
-        "sys.stdout = file2\n".format(task_id, task_id) + temp
-    try:
-        exec(code2)
-    except Exception:
-        return False
-    res = None
-    with open('static/text/output{}.txt'.format(task_id)) as file:
-        res = file.read().rstrip()
+def check_task(task_id, code):  # Проверка решения
+    res, solve, inputs = [], [], []
+    with open('static/text/input{}.txt'.format(task_id)) as file:
+        for line in file.readlines():
+            inputs.append(line.strip())
         file.close()
     with open('static/text/res{}.txt'.format(task_id)) as file2:
-        solve = file2.read().rstrip()
+        for line in file2.readlines():
+            solve.append(line.rstrip())
         file2.close()
+    for number in range(3):
+        input_file = open('static/text/input_temp.txt', 'w')
+        input_file.write(inputs[number])
+        input_file.close()
+        temp = code if code.endswith('\n') else code + \
+            '\n' + "sys.stdout = stdout\nfile1.close()\nfile2.close()\n"
+        code2 = \
+            "file1 = open('static/text/input_temp.txt')\n" \
+            "file2 = open('static/text/output_temp.txt', 'w')\n" \
+            "stdout = sys.stdout\nsys.stdin = file1\n" \
+            "sys.stdout = file2\n" + temp
+        try:
+            exec(code2)
+        except Exception:
+            return False
+        with open('static/text/output_temp.txt'.format(task_id)) as file:
+            res.append(file.read().rstrip())  # Добавление результата в список
+            file.close()
     return res == solve
 
 
-class Tester:
+def create_teacher():  # Добавление учителя в базу
+    user1 = Student.query.filter_by(username='teacher1').first()
+    if user1 is None:
+        teacher = Student(username='teacher1',
+                          password_hash=generate_password_hash('teacher1'),
+                          name='Константин', surname='Проценко',
+                          email='protsenko@lyceum.yaconnect.com',
+                          group='-', teacher=True)
+        db.session.add(teacher)
+        db.session.commit()
+
+
+class Tester:  # Класс, следящий за прохождением теста абитуриента
     def __init__(self):
         self.started = False
         self.result = [None for number in range(5)]
         self.answers = [None for number in range(5)]
 
-    def start(self):
+    def start(self):  # Начать тест
         self.started = True
         self.result = [None for number in range(5)]
         self.answers = [None for number in range(5)]
 
-    def stop(self):
+    def stop(self):  # Закончить тест
         self.started = False
 
     def has_started(self):
         return self.started
 
-    def add(self, ind, answer):
+    def add(self, ind, answer):  # Добавить ответ
         if self.started:
             self.answers[ind] = answer
             self.result[ind] = TASKS[ind][1] == answer
-            print(self.result[ind])
-            print(TASKS[ind][1], answer, TASKS[ind][1] == answer)
 
     def get_result(self):
         return self.result.count(True)
@@ -155,7 +182,7 @@ class Tester:
         return self.answers
 
 
-class Student(db.Model):
+class Student(db.Model):  # Класс пользователя
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(80), unique=False, nullable=False)
@@ -169,11 +196,11 @@ class Student(db.Model):
         return '<Student {} {} {} {}>'.format(
             self.id, self.username, self.name, self.surname)
 
-    def check_password(self, password):
+    def check_password(self, password):  # Проверка пароля
         return check_password_hash(self.password_hash, password)
 
 
-class Task(db.Model):
+class Task(db.Model):  # Класс задачи
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(80), unique=True, nullable=False)
     condition = db.Column(db.String(80), unique=False, nullable=False)
@@ -183,7 +210,7 @@ class Task(db.Model):
         return '<Task {} {}>'.format(self.id, self.title)
 
 
-class Solution(db.Model):
+class Solution(db.Model):  # Класс решения
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(1000), unique=False, nullable=False)
     status = db.Column(db.String(50), unique=False, nullable=False)
@@ -199,7 +226,7 @@ class Solution(db.Model):
         return '<Solution {} {} {}>'.format(self.id, self.task, self.status)
 
 
-class Article(db.Model):
+class Article(db.Model):  # Класс новости
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100))
     content = db.Column(db.String(500))
@@ -209,7 +236,7 @@ class Article(db.Model):
         return '<News {} {}>'.format(self.id, self.title)
 
 
-class LoginForm(FlaskForm):
+class LoginForm(FlaskForm):  # Форма авторизации
     username = StringField('Введите логин',
                            validators=[DataRequired('Заполните это поле')])
     password = \
@@ -218,7 +245,7 @@ class LoginForm(FlaskForm):
     submit = SubmitField('Войти')
 
 
-class RegisterForm(FlaskForm):
+class RegisterForm(FlaskForm):  # Форма регистрации
     username = \
         StringField('Введите Ваш логин',
                     validators=[DataRequired(message='Заполните это поле'),
@@ -243,21 +270,26 @@ class RegisterForm(FlaskForm):
         StringField('Введите Ваш email',
                     validators=[DataRequired(message='Заполните это поле'),
                                 Email(message='Неправильный адрес почты')])
-    group = SelectField('Выберите вашу группу',
-                        choices=[('1 группа, 2 год', '1 группа, 2 год'),
-                                 ('2 группа, 2 год', '2 группа, 2 год'),
-                                 ('1 группа, 1 год', '1 группа, 1 год')])
+    group = SelectField('Выберите Вашу группу',
+                        choices=[('1 год 1 группа', '1 год 1 группа'),
+                                 ('2 год 1 группа', '2 год 1 группа'),
+                                 ('2 год 2 группа', '2 год 2 группа')])
     submit = SubmitField('Зарегистрироваться')
 
-    def validate_username(self, username):
+    def validate_username(self, username):  # Проверка, занят ли логин
         student = Student.query.filter_by(username=username.data).first()
         if student is not None:
-            raise ValidationError('Данный логин уже существует')
+            raise ValidationError('Данный логин уже занят')
 
-    def validate_password(self, password):
+    def validate_password(self, password):  # Проверка, занят ли пароль
         check = check_password(password.data)
         if check is not 'OK':
             raise ValidationError(check)
+
+    def validate_email(self, email):  # Проверка, занята ли почта
+        student = Student.query.filter_by(email=email.data).first()
+        if student is not None:
+            raise ValidationError('Данный e-mail уже занят')
 
 
 class TaskForm(FlaskForm):
@@ -274,56 +306,42 @@ class TaskForm(FlaskForm):
                                       'в решении: {}'.format(word))
 
 
-class TestForm1(FlaskForm):
-    task = StringField(TASKS[0][0], validators=[DataRequired()])
+class TestForm(FlaskForm):  # Форма вопроса теста со свободным ответом
+    task = StringField(validators=[DataRequired()])
     submit = SubmitField('Далее')
 
 
-class TestForm2(FlaskForm):
-    task = StringField(TASKS[1][0], validators=[DataRequired()])
-    submit = SubmitField('Далее')
-
-
-class TestForm3(FlaskForm):
-    task = StringField(TASKS[2][0], validators=[DataRequired()])
-    submit = SubmitField('Далее')
-
-
-class TestForm4(FlaskForm):
-    task = StringField(TASKS[3][0], validators=[DataRequired()])
-    submit = SubmitField('Далее')
-
-
-class TestForm5(FlaskForm):
-    task = RadioField(TASKS[4][0], validators=[DataRequired()],
+class RadioTestForm(FlaskForm):  # Форма вопроса теста с выбором ответа
+    task = RadioField(validators=[DataRequired()],
                       choices=[('Согласен', 'Согласен'),
                                ('Не согласен', 'Не согласен')])
     submit = SubmitField('Далее')
 
 
-db.create_all()
+db.create_all()  # Создаем все сущности в базе
 tester = Tester()
 
 
-@app.errorhandler(403)
+@app.errorhandler(403)  # Отработка ошибки 403
 def page_not_found(error):
-    return render_template('Error.html', title='Неверный логин или пароль',
+    return render_template('Error.html',
+                           title='Страница не доступна',
                            error_code=403), 403
 
 
-@app.errorhandler(404)
+@app.errorhandler(404)  # Отработка ошибки 404
 def page_not_found(error):
     return render_template('Error.html', title='Страница не найдена',
                            error_code=404), 404
 
 
-@app.errorhandler(500)
+@app.errorhandler(500)  # Отработка ошибки 500
 def error_in_program(error):
     return render_template('Error.html', title='Ошибка во время выполнения',
                            error_code=500), 500
 
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET', 'POST'])  # Страница авторизации
 @app.route('/login/', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
@@ -332,14 +350,19 @@ def login():
         if user is None or not user.check_password(form.password.data):
             abort(403, message='Неверный логин или пароль')
         else:
+            session.pop('username', 0)
+            session.pop('user_id', 0)
             session['username'] = user.username
             session['user_id'] = user.id
-            return redirect("/index")
+            if user.teacher:
+                return redirect('/teacher_page')
+            else:
+                return redirect("/index")
     return render_template('Login.html', title='Авторизация',
                            form=form)
 
 
-@app.route('/register', methods=['GET', 'POST'])
+@app.route('/register', methods=['GET', 'POST'])  # Страница регистрации
 @app.route('/register/', methods=['GET', 'POST'])
 def register():
     form = RegisterForm()
@@ -348,17 +371,19 @@ def register():
             Student(username=form.username.data,
                     password_hash=generate_password_hash(form.password.data),
                     name=form.name.data, surname=form.surname.data,
-                    email=form.email.data, group=form.group.data,
+                    group=form.group.data, email=form.email.data,
                     teacher=False)
         db.session.add(user)
         db.session.commit()
+        session.pop('username', 0)
+        session.pop('user_id', 0)
         session['username'] = form.username.data
         session['user_id'] = user.id
         return redirect('/index')
     return render_template('Register.html', title='Регистрация', form=form)
 
 
-@app.route('/logout', methods=['GET'])
+@app.route('/logout', methods=['GET'])  # Выход из аккаунта
 @app.route('/logout/', methods=['GET'])
 def logout():
     session.pop('username', 0)
@@ -366,7 +391,7 @@ def logout():
     return redirect('/login')
 
 
-@app.route('/index', methods=['GET', 'POST'])
+@app.route('/index', methods=['GET', 'POST'])  # Страница c навигацией задач
 @app.route('/index/', methods=['GET', 'POST'])
 def index():
     if 'username' not in session:
@@ -374,16 +399,24 @@ def index():
     user = Student.query.filter_by(username=session['username']).first()
     if not user:
         return redirect('/login')
+    if user.teacher:
+        return redirect('/teacher_page')
     tasks = Task.query.all()
     sols = []
     for task in tasks:
         temp = Solution.query.filter_by(student_id=user.id,
-                                        task_id=task.id).first()
-        sols.append(temp)
+                                        task_id=task.id)
+        temp2 = Solution.query.filter_by(student_id=user.id,
+                                         task_id=task.id).first()
+        if temp2 is not None:
+            sols.append(temp[-1])
+        else:
+            sols.append(temp2)
     return render_template('Task_page.html', title='Задача',
                            items=tasks, sols=sols)
 
 
+# Страница задачи
 @app.route('/index/<int:task_id>', methods=['GET', 'POST'])
 @app.route('/index/<int:task_id>/', methods=['GET', 'POST'])
 def task_page(task_id):
@@ -393,48 +426,90 @@ def task_page(task_id):
         form = TaskForm()
         if 'username' not in session or user is None:
             return redirect('/login')
+        if user.teacher:
+            abort(403, message='Страница не доступна')
         temp = Solution.query.filter_by(student_id=user.id, task_id=task.id).first()
+        temp2 = Solution.query.filter_by(student_id=user.id, task_id=task.id)
+        booly, booly2 = None, None
+        if temp is not None:
+            temp = temp2[-1]
+            booly, booly2 = False, temp.status == 'WA'
+        else:
+            booly, booly2 = True, False
         if form.validate_on_submit():
-            if not task.handheld and temp is None:
-                if check_task(task.id, form.text.data):
-                    solution = Solution(code=form.text.data, status='OK',
-                                        student_id=user.id, task_id=task.id)
-                    user.Solutions.append(solution)
-                    task.Solutions.append(solution)
-                    db.session.add(solution)
-                    db.session.commit()
-                else:
-                    solution = Solution(code=form.text.data, status='WA',
-                                        student_id=user.id, task_id=task.id)
-                    user.Solutions.append(solution)
-                    task.Solutions.append(solution)
-                    db.session.add(solution)
-                    db.session.commit()
-            elif temp is None:
-                solution = Solution(code=form.text.data, status='-',
-                                    student_id=user.id, task_id=task.id)
-                user.Solutions.append(solution)
-                task.Solutions.append(solution)
-                db.session.add(solution)
-                db.session.commit()
-        return render_template('Task.html', task=task, form=form, sol=temp)
+            if not task.handheld and \
+                    (booly or booly2):  # Механическая проверка
+                if check_task(task.id, form.text.data):  # Зачесть задачу
+                    add_solution(form.text.data, 'OK', user, task)
+                else:  # Отправить задачу на доработку
+                    add_solution(form.text.data, 'WA', user, task)
+            elif booly or booly2: # Отправить задачу на ручную проверку
+                add_solution(form.text.data, '-', user, task)
+        return render_template('Task.html', title=task.title, task=task,
+                               form=form, sol=temp)
     else:
         abort(404, message='Страница не найдена')
+
+
+@app.route('/teacher_page') # Страница учителя
+@app.route('/teacher_page/')
+def teacher_page():
+    if 'username' not in session:
+        return redirect('/login')
+    user = Student.query.filter_by(username=session['username']).first()
+    if user is None:
+        return redirect('/login')
+    if not user.teacher:
+        abort(403, message='Страница не доступна')
+    solutions = list(Solution.query.filter_by(status='-'))
+    return render_template('Solutions.html', solutions=solutions,
+                           title='Непроверенные решения')
+
+
+@app.route('/accept/<int:solution_id>')  # Зачесть задачу (вручную)
+@app.route('/accept/<int:solution_id>/')
+def accept(solution_id):
+    if 'username' not in session:
+        return redirect('/login')
+    user = Student.query.filter_by(username=session['username']).first()
+    if user is None:
+        return redirect('/login')
+    if not user.teacher:
+        abort(403, message='Страница не доступна')
+    solution = Solution.query.filter_by(id=solution_id).first()
+    if solution:
+        solution.status = 'OK'
+        db.session.commit()
+    return redirect('/teacher_page')
+
+
+@app.route('/refuse/<int:solution_id>')  # Отправить задачу на добработку
+@app.route('/refuse/<int:solution_id>/')
+def refuse(solution_id):
+    if 'username' not in session:
+        return redirect('/login')
+    user = Student.query.filter_by(username=session['username']).first()
+    if user is None:
+        return redirect('/login')
+    if not user.teacher:
+        abort(403, message='Страница не доступна')
+    solution = Solution.query.filter_by(id=solution_id).first()
+    if solution:
+        solution.status = 'WA'
+        db.session.commit()
+    return redirect('/teacher_page')
 
 
 @app.route('/', methods=['GET'])
 @app.route('/news', methods=['GET'])
 @app.route('/news/', methods=['GET'])
-def main():
+def main():  # Основная страница
     news = Article.query.all()[:10]
     return render_template('News.html', title='Яндекс Лицей. Магнитогорск',
-                           news=news,
-                           src1=url_for('static', filename='img/d.png'),
-                           src2=url_for('static', filename='img/d.png'),
-                           src3=url_for('static', filename='img/d.png'))
+                           news=news)
 
 
-@app.route('/news/<int:news_id>', methods=['GET'])
+@app.route('/news/<int:news_id>', methods=['GET'])  # Страница новости
 @app.route('/news/<int:news_id>/', methods=['GET'])
 def get_article(news_id):
     article = Article.query.filter_by(id=news_id).first()
@@ -442,65 +517,52 @@ def get_article(news_id):
         with open(article.text) as file:
             text = file.read()
         return render_template('Article.html', title=article.title,
-                               article=article, text=text,
-                               src1=url_for('static', filename='img/d.png'),
-                               src2=url_for('static', filename='img/d.png'),
-                               src3=url_for('static', filename='img/d.png'))
+                               article=article, text=text)
     else:
         abort(404, message='Article not found')
 
 
-@app.route('/place', methods=['GET'])
+@app.route('/place', methods=['GET'])  # Страница местоположения
 @app.route('/place/', methods=['GET'])
 def place():
-    return render_template('Place.html', title='Местоположение',
-                           src1=url_for('static', filename='img/d.png'),
-                           src2=url_for('static', filename='img/d.png'),
-                           src3=url_for('static', filename='img/d.png'))
+    return render_template('Place.html', title='Местоположение')
 
 
-@app.route('/teachers', methods=['GET'])
+@app.route('/teachers', methods=['GET'])  # Страница об учителях
 @app.route('/teachers/', methods=['GET'])
 def teachers():
-    return render_template('Teachers.html', title='Преподаватели',
-                           src1=url_for('static', filename='img/d.png'),
-                           src2=url_for('static', filename='img/d.png'),
-                           src3=url_for('static', filename='img/d.png'))
+    return render_template('Teachers.html', title='Преподаватели')
 
 
-@app.route('/coordinator', methods=['GET'])
+@app.route('/coordinator', methods=['GET'])  # Страница о координаторе
 @app.route('/coordinator/', methods=['GET'])
 def coordinator():
-    return render_template('Coordinator.html', title='Координатор',
-                           src1=url_for('static', filename='img/d.png'),
-                           src2=url_for('static', filename='img/d.png'),
-                           src3=url_for('static', filename='img/d.png'))
+    return render_template('Coordinator.html', title='Координатор')
 
 
-@app.route('/abitu', methods=['GET'])
+@app.route('/abitu', methods=['GET'])  # Страница для абитуриентов
 @app.route('/abitu/', methods=['GET'])
 def abitu():
-    return render_template('Abitu.html', title='Абитуриентам',
-                           src1=url_for('static', filename='img/d.png'),
-                           src2=url_for('static', filename='img/d.png'),
-                           src3=url_for('static', filename='img/d.png'))
+    return render_template('Abitu.html', title='Абитуриентам')
 
 
-@app.route('/test', methods=['GET'])
+@app.route('/test', methods=['GET'])  # Страница с тестом
 @app.route('/test/', methods=['GET'])
 def test():
     return render_template('Test.html', title='Пробное тестирование')
 
 
-@app.route('/test/<int:task_id>', methods=['GET', 'POST'])
-@app.route('/test/<int:task_id>/', methods=['GET', 'POST'])
+@app.route('/test/<int:task_id>', methods=['GET', 'POST'])  # Страница вопроса
+@app.route('/test/<int:task_id>/', methods=['GET', 'POST'])  # теста
 def task_of_test(task_id):
     if 1 <= task_id <= 5:
         if task_id == 1:
             tester.start()
-        task_dict = {1: TestForm1(), 2: TestForm2(), 3: TestForm3(),
-                     4: TestForm4(), 5: TestForm5()}
-        form = task_dict[task_id]
+        if task_id != 5:
+            form = TestForm()
+        else:
+            form = RadioTestForm()
+        form.task.label = TASKS[task_id - 1][0]
         if form.validate_on_submit():
             tester.add(task_id - 1, form.task.data)
             if task_id != 5:
@@ -513,7 +575,7 @@ def task_of_test(task_id):
         abort(404, message='Task not found')
 
 
-@app.route('/test/result', methods=['GET'])
+@app.route('/test/result', methods=['GET']) # Страница результата теста
 @app.route('/test/result/', methods=['GET'])
 def test_result():
     if tester.has_started():
@@ -527,49 +589,38 @@ def test_result():
         abort(404, message='Страница не найдена')
 
 
-@app.route('/schedule', methods=['GET', 'POST'])
+@app.route('/schedule', methods=['GET', 'POST'])  # Страница расписания
 @app.route('/schedule/', methods=['GET', 'POST'])
 def schedule():
-    return render_template('Schedule.html', title='Расписание',
-                           src1=url_for('static', filename='img/d.png'),
-                           src2=url_for('static', filename='img/d.png'),
-                           src3=url_for('static', filename='img/d.png'))
+    return render_template('Schedule.html', title='Расписание')
 
 
-@app.route('/studentbook')
+@app.route('/studentbook')  # Страница навигации учебников
 @app.route('/studentbook/')
 def studentbook():
     return render_template('Studentbook.html', title='Учебные материалы',
-                           src1=url_for('static', filename='img/d.png'),
-                           src2=url_for('static', filename='img/d.png'),
-                           src3=url_for('static', filename='img/d.png'),
                            src=None)
 
 
-@app.route('/studentbook/<int:book_id>/', methods=['GET'])
-@app.route('/studentbook/<int:book_id>', methods=['GET'])
+@app.route('/studentbook/<int:book_id>/', methods=['GET'])  # Страница
+@app.route('/studentbook/<int:book_id>', methods=['GET'])  # учебника
 def studentbook_by_id(book_id):
     if not 1 <= book_id <= 3:
         abort(404, message='Книга не найдена')
     else:
         return render_template('Studentbook.html', title='Учебные материалы',
-                               src1=url_for('static', filename='img/d.png'),
-                               src2=url_for('static', filename='img/d.png'),
-                               src3=url_for('static', filename='img/d.png'),
                                src=BOOK[book_id])
 
 
-@app.route('/program')
+@app.route('/program')  # Страница программы обучения
 @app.route('/program/')
 def program():
     return render_template('Program.html', title='Программа обучения',
-                           src1=url_for('static', filename='img/d.png'),
-                           src2=url_for('static', filename='img/d.png'),
-                           src3=url_for('static', filename='img/d.png'),
                            href=PROGRAM)
 
 
 if __name__ == '__main__':
-    fill_news()
+    fill_news()  # Заполнить базу
     fill_tasks()
-    app.run(port=8000, host='127.0.0.1')
+    create_teacher()
+    app.run(port=8000, host='127.0.0.1')  # Запустить сервер

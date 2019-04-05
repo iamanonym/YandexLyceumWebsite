@@ -8,10 +8,10 @@
         <h5 class="mb-0">
             <button class="btn btn-link" data-toggle="collapse" data-target="#{{ (number + 1) * 10 }}" aria-expanded="false" aria-controls="{{ (number + 1) * 10 }}">
                 {{ items[number].title }}
-            </button>
             {% if items[number].handheld %}
             <span class="badge badge-light">РУЧ</span>
             {% endif %}
+            </button>
             {% if sols[number] %}
             {% if sols[number].status == 'OK' %}
                 <img src="/static/img/green.png" width="30" height="30"></img>

@@ -18,7 +18,10 @@
     {% endif %}
 </h1>
 <div>
-    {{ task.condition }}
+    {{ task.condition }}</br></br>
+    <div class="alert alert-info" role="alert">
+        Внимание! В решении нельзя использовать следующие слова: while, for, def, import, open, os
+    </div>
 </div>
 <div>
     <form action="" method="post" novalidate>

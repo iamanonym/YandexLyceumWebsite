@@ -1,0 +1,26 @@
+{% extends 'Base2.html' %}
+
+{% block content %}
+{% if not solutions %}
+<div>
+    <h3>Непроверенных решений нет</h3>
+</div>
+{% else %}
+{% for solution in solutions %}
+<div>
+    <h3>{{ solution.task.title }} ({{ solution.student.username }})</h3>
+    {{ solution.task.condition }}</br></br>
+    <code>
+        <pre>{{ solution.code }}</pre>
+    </code></br></br>
+    <a class="btn btn-success" href="/accept/{{ solution.id }}" role="button">
+        Зачесть
+    </a>
+    <a class="btn btn-danger" href="/refuse/{{ solution.id }}" role="button">
+        Отправить на доработку
+    </a>
+</div>
+<hr></br>
+{% endfor %}
+{% endif %}
+{% endblock %}
