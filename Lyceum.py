@@ -153,13 +153,13 @@ def create_teacher():  # Добавление учителя в базу
 class Tester:  # Класс, следящий за прохождением теста абитуриента
     def __init__(self):
         self.started = False
-        self.result = [None for number in range(5)]
-        self.answers = [None for number in range(5)]
+        self.result = [None for _ in range(5)]
+        self.answers = [None for _ in range(5)]
 
     def start(self):  # Начать тест
         self.started = True
-        self.result = [None for number in range(5)]
-        self.answers = [None for number in range(5)]
+        self.result = [None for _ in range(5)]
+        self.answers = [None for _ in range(5)]
 
     def stop(self):  # Закончить тест
         self.started = False
@@ -428,7 +428,8 @@ def task_page(task_id):
             return redirect('/login')
         if user.teacher:
             abort(403, message='Страница не доступна')
-        temp = Solution.query.filter_by(student_id=user.id, task_id=task.id).first()
+        temp = Solution.query.filter_by(student_id=user.id,
+                                        task_id=task.id).first()
         temp2 = Solution.query.filter_by(student_id=user.id, task_id=task.id)
         booly, booly2 = None, None
         if temp is not None:
@@ -443,7 +444,7 @@ def task_page(task_id):
                     add_solution(form.text.data, 'OK', user, task)
                 else:  # Отправить задачу на доработку
                     add_solution(form.text.data, 'WA', user, task)
-            elif booly or booly2: # Отправить задачу на ручную проверку
+            elif booly or booly2:  # Отправить задачу на ручную проверку
                 add_solution(form.text.data, '-', user, task)
         return render_template('Task.html', title=task.title, task=task,
                                form=form, sol=temp)
@@ -451,7 +452,7 @@ def task_page(task_id):
         abort(404, message='Страница не найдена')
 
 
-@app.route('/teacher_page') # Страница учителя
+@app.route('/teacher_page')  # Страница учителя
 @app.route('/teacher_page/')
 def teacher_page():
     if 'username' not in session:
@@ -558,6 +559,8 @@ def task_of_test(task_id):
     if 1 <= task_id <= 5:
         if task_id == 1:
             tester.start()
+        elif not tester.has_started():
+            return redirect('/test')
         if task_id != 5:
             form = TestForm()
         else:
@@ -575,7 +578,7 @@ def task_of_test(task_id):
         abort(404, message='Task not found')
 
 
-@app.route('/test/result', methods=['GET']) # Страница результата теста
+@app.route('/test/result', methods=['GET'])  # Страница результата теста
 @app.route('/test/result/', methods=['GET'])
 def test_result():
     if tester.has_started():
