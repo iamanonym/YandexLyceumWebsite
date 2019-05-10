@@ -1,17 +1,16 @@
-{
-"1": {
+[{
 "title": "Статус изменён, мем на доработке!",
 "content": "В честь 1 апреля мы запускаем конкурс мемов...",
-"text": "static/text/1.txt"
+"text": "main/static/text/news/article1.txt"
 },
-"2": {
+{
 "title": "Мартовский дайджест Яндекс.Лицея",
 "content": "В этом письме мы расскажем, что нового случилось в Лицее за последний месяц...",
-"text": "static/text/2.txt"
+"text": "main/static/text/news/article2.txt"
 }, 
-"3": {
+{
 "title": "Выпускной-2018",
 "content": "Совсем недавно в Яндекс.Лицее случился первый выпуск...",
-"text": "static/text/3.txt"
+"text": "main/static/text/news/article3.txt"
 }
-}
+]

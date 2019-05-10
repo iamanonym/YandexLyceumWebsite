@@ -20,13 +20,13 @@
 </br>
 <h1>Правильные ответы</h1></br>
 {% for counter in range(5) %}
-    {{ tasks[counter][0] }}</br></br>
+    {{ questions[counter] }}</br></br>
     {% if res_list[counter] %}
     <font color="green">Ваш ответ: {{ answers[counter] }}</font></br>
     {% else %}
     <font color="red">Ваш ответ: {{ answers[counter] }}</font></br>
     {% endif %}
-    Правильный ответ: {{ tasks[counter][1] }}</br></br>
+    Правильный ответ: {{ tasks[counter].answer }}</br></br>
 </div>
 {% endfor %}
 {% endblock %}

@@ -1,0 +1,17 @@
+[
+{"question": "main/static/text/test/1.txt",
+"answer": "930",
+"form": "stand"},
+{"question": "main/static/text/test/2.txt",
+"answer": "91",
+"form": "stand"},
+{"question": "main/static/text/test/3.txt",
+"answer": "5",
+"form": "stand"},
+{"question": "main/static/text/test/4.txt",
+"answer": "2",
+"form": "stand"},
+{"question": "main/static/text/test/5.txt",
+"answer": "Не согласен",
+"form": "radio"}
+]
