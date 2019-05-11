@@ -44,6 +44,16 @@ class Article(db.Model):  # Класс новости
     text = db.Column(db.String(10000), unique=False, nullable=False)
 
 
+class Comment(db.Model):  # Класс комментария
+    id = db.Column(db.Integer, primary_key=True)
+    author = db.Column(db.String(100), unique=False, nullable=False)
+    content = db.Column(db.String(1000), unique=False, nullable=False)
+    article_id = db.Column(db.Integer, db.ForeignKey('article.id'),
+                           nullable=False)
+    article = db.relationship('Article',
+                              backref=db.backref('Comments', lazy=True))
+
+
 class TestQuestion(db.Model):  # Класс вопроса в тесте
     id = db.Column(db.Integer, primary_key=True)
     question = db.Column(db.String(500), unique=True, nullable=False)
@@ -102,13 +112,22 @@ def fill_tasks():  # Добавление задач в базу
                 db.session.commit()
 
 
-def create_teacher():  # Добавление учителя в базу
+def create_teacher():  # Добавление учителей в базу
     user1 = Student.query.filter_by(username='teacher1').first()
     if user1 is None:
         teacher = Student(username='teacher1',
                           password_hash=generate_password_hash('teacher1'),
                           name='Константин', surname='Проценко',
                           email='protsenko@lyceum.yaconnect.com',
-                          group='-', teacher=True)
+                          group='2 год 1 группа', teacher=True)
+        db.session.add(teacher)
+        db.session.commit()
+    user2 = Student.query.filter_by(username='teacher2').first()
+    if user2 is None:
+        teacher = Student(username='teacher2',
+                          password_hash=generate_password_hash('teacher2'),
+                          name='Елена', surname='Глазкова',
+                          email='glazkova@lyceum.yaconnect.com',
+                          group='2 год 2 группа', teacher=True)
         db.session.add(teacher)
         db.session.commit()

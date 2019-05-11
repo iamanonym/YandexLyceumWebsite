@@ -1,4 +1,5 @@
 {% extends 'Base.html' %}
+{% import 'bootstrap/wtf.html' as wtf %}
 
 {% block content %}
 <table class="table">
@@ -15,28 +16,7 @@
     <tbody>
     <tr>
         <td>
-            <form action="" method="post" novalidate>
-            {{ form.hidden_tag() }}
-            <p>
-            {{ form.username.label }}<br>
-            {{ form.username }}<br>
-            {% for error in form.username.errors %}
-                <div class="alert alert-danger" role="alert">
-                    {{ error }}
-                </div>
-            {% endfor %}
-            </p>
-            <p>
-            {{ form.password.label }}<br>
-            {{ form.password }}<br>
-            {% for error in form.password.errors %}
-                <div class="alert alert-danger" role="alert">
-                    {{ error }}
-                </div>
-            {% endfor %}
-            </p>
-                <p>{{ form.submit }}</p>
-            </form>
+            {{ wtf.quick_form(form) }}
         </td>
         <td>
             <center>

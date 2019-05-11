@@ -1,8 +1,24 @@
 {% extends 'Main.html' %}
+{% import 'bootstrap/wtf.html' as wtf %}
 
 {% block content %}
 <h1>{{ article.title }}</h1>
 <pre>{{ text }}</pre>
 </br>
+<h3>Комментарии</h3>
+{% if comments %}
+{% for comment in comments %}
+<div>
+    <h6>{{ comment.author }}</h6>
+    {{ comment.content }}
+</div>
+</br>
+{% endfor %}
+{% else %}
+    <a>Комментариев пока нет</a>
+{% endif %}
+</br>
+</br>
+{{ wtf.quick_form(form) }}
 </br>
 {% endblock %}

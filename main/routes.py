@@ -1,13 +1,25 @@
 from flask import render_template, session, redirect
 from werkzeug.security import generate_password_hash
 from flask_restful import abort
+import json
 from main.forms import LoginForm, TaskForm, \
-    RegisterForm, TestForm, RadioTestForm
+    RegisterForm, TestForm, RadioTestForm, CommentForm
 from main.bases import Student, Task, Solution, \
-    Article, TestQuestion, add_solution
+    Article, TestQuestion, Comment, add_solution
 from main.app import app, db
 from main.utils import tester, check_task
-from Lyceum import BOOK, PROGRAM
+
+with open('main/static/json/Rasp_url.json') as file:
+    PROGRAM = json.loads(file.read())
+with open('main/static/json/Book_url.json') as file2:
+    BOOK = json.loads(file2.read())
+
+
+@app.errorhandler(401)  # Отработка ошибки 401
+def wrong_login(error):
+    return render_template('Error.html',
+                           title='Неверный логин или пароль',
+                           error_code=401), 401
 
 
 @app.errorhandler(403)  # Отработка ошибки 403
@@ -36,7 +48,7 @@ def login():
     if form.validate_on_submit():
         user = Student.query.filter_by(username=form.username.data).first()
         if user is None or not user.check_password(form.password.data):
-            abort(403, message='Неверный логин или пароль')
+            abort(401, message='Неверный логин или пароль')
         else:
             session.pop('username', 0)
             session.pop('user_id', 0)
@@ -150,7 +162,12 @@ def teacher_page():
         return redirect('/login')
     if not user.teacher:
         abort(403, message='Страница не доступна')
-    solutions = list(Solution.query.filter_by(status='-'))
+    temp = list(Solution.query.filter_by(status='-'))
+    solutions = []
+    for solution in temp:
+        student = Student.query.filter_by(id=solution.student_id).first()
+        if student.group == user.group:
+            solutions.append(solution)
     return render_template('Solutions.html', solutions=solutions,
                            title='Непроверенные решения')
 
@@ -198,15 +215,24 @@ def main():  # Основная страница
                            news=news)
 
 
-@app.route('/news/<int:news_id>', methods=['GET'])  # Страница новости
-@app.route('/news/<int:news_id>/', methods=['GET'])
+@app.route('/news/<int:news_id>', methods=['GET', 'POST'])  # Страница новости
+@app.route('/news/<int:news_id>/', methods=['GET', 'POST'])
 def get_article(news_id):
     article = Article.query.filter_by(id=news_id).first()
+    form = CommentForm()
     if article is not None:
         with open(article.text) as file:
             text = file.read()
+        if form.validate_on_submit():
+            comment = Comment(author=form.name.data,
+                              content=form.comment.data,
+                              article_id=article.id)
+            article.Comments.append(comment)
+            db.session.add(comment)
+            db.session.commit()
         return render_template('Article.html', title=article.title,
-                               article=article, text=text)
+                               article=article, text=text, form=form,
+                               comments=article.Comments)
     else:
         abort(404, message='Article not found')
 
@@ -306,7 +332,7 @@ def studentbook_by_id(book_id):
         abort(404, message='Книга не найдена')
     else:
         return render_template('Studentbook.html', title='Учебные материалы',
-                               src=BOOK[book_id])
+                               src=BOOK[str(book_id)])
 
 
 @app.route('/program')  # Страница программы обучения
