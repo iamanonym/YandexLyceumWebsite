@@ -79,7 +79,8 @@ def fill_test_questions():  # Добавление вопросов теста �
         test = json.loads(file.read())
         for test_task in test:
             temp = \
-                Article.query.filter_by(title=test_task['question']).first()
+                TestQuestion.query.\
+                filter_by(question=test_task['question']).first()
             if temp is None:  # Проверка наличия новости в базе
                 question_obj = TestQuestion(question=test_task['question'],
                                             answer=test_task['answer'],
